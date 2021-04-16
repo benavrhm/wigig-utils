@@ -1,3 +1,4 @@
+#define UIO_DMEM_GENIRQ_ALLOC
 /*
  * Copyright (c) 2012-2017 Qualcomm Atheros, Inc.
  * Copyright (c) 2018, The Linux Foundation. All rights reserved.
@@ -19,6 +20,232 @@
 #include "wil6210_ethdev.h"
 #include <rte_errno.h>
 #include <unistd.h>
+
+
+/* Smple-minded aligned block allocator */
+
+#define ALLOCATED	1
+#define FREE		0
+#define UNIT_TEST
+
+int i0s[2];
+int i1s[4];
+int i2s[8];
+int i3s[16];
+int i4s[32];
+int i5s[64];
+int i6s[128];
+int i7s[256];
+
+void init_allocator(void) {
+	int i;
+	for (i=0; i<256; i++) i7s[i] = 0;
+	for (i=0; i<128; i++) i6s[i] = 0;
+	for (i=0; i<64; i++) i5s[i] = 0;
+	for (i=0; i<32; i++) i4s[i] = 0;
+	for (i=0; i<16; i++) i3s[i] = 0;
+	for (i=0; i<8; i++) i2s[i] = 0;
+	for (i=0; i<4; i++) i1s[i] = 0;
+	for (i=0; i<2; i++) i0s[i] = 0;
+}
+
+int allocate(size_t block) {
+	int i, j, i0, i1, i2, i3, i4, i5, i6, i7, i8;
+
+	if (block == 512) {
+		for (i0=0; i0<2; i0++) { /* 512K */
+			if (i0s[i0] == ALLOCATED)
+				continue;
+			else {
+				i0s[i0] = ALLOCATED; /* Bingo! */
+				for (i=i0*2, j=0;   j<2;   i++, j++) i1s[i] = ALLOCATED;
+				for (i=i0*4, j=0;   j<4;   i++, j++) i2s[i] = ALLOCATED;
+				for (i=i0*8, j=0;   j<8;   i++, j++) i3s[i] = ALLOCATED;
+				for (i=i0*16, j=0;  j<16;  i++, j++) i4s[i] = ALLOCATED;
+				for (i=i0*32, j=0;  j<32;  i++, j++) i5s[i] = ALLOCATED;
+				for (i=i0*64, j=0;  j<64;  i++, j++) i6s[i] = ALLOCATED;
+				for (i=i0*128, j=0; j<128; i++, j++) i7s[i] = ALLOCATED;
+				return i0*512*1024;
+			}
+		}
+		return -1;
+	}
+	else if (block == 256) {
+		for (i1=0; i1<4; i1++) { /* 256K */
+			if (i1s[i1] != FREE)
+				continue;
+			else {
+				i1s[i1] = ALLOCATED; /* Bingo! */
+				i0s[i1 >> 1] = ALLOCATED;
+
+				for (i=i1*4, j=0;   j<4;   i++, j++) i2s[i] = ALLOCATED;
+				for (i=i1*8, j=0;   j<8;   i++, j++) i3s[i] = ALLOCATED;
+				for (i=i1*16, j=0;  j<16;  i++, j++) i4s[i] = ALLOCATED;
+				for (i=i1*32, j=0;  j<32;  i++, j++) i5s[i] = ALLOCATED;
+				for (i=i1*64, j=0;  j<64;  i++, j++) i6s[i] = ALLOCATED;
+				for (i=i1*128, j=0; j<128; i++, j++) i7s[i] = ALLOCATED;
+				return i1*256*1024;
+			}
+		}
+		return -1;
+	}
+	else if (block == 128) {
+		for (i2=0; i2<8; i2++) { /* 128K */
+			if (i2s[i2] != FREE)
+				continue;
+			else {
+				i2s[i2] = ALLOCATED; /* Bingo! */
+				i1s[i2 >> 1] = ALLOCATED;
+				i0s[i2 >> 2] = ALLOCATED;
+
+				for (i=i2*8,  j=0;  j<8;   i++, j++) i3s[i] = ALLOCATED;
+				for (i=i2*16, j=0;  j<16;  i++, j++) i4s[i] = ALLOCATED;
+				for (i=i2*32, j=0;  j<32;  i++, j++) i5s[i] = ALLOCATED;
+				for (i=i2*64, j=0;  j<64;  i++, j++) i6s[i] = ALLOCATED;
+				for (i=i2*128, j=0; j<128; i++, j++) i7s[i] = ALLOCATED;
+				return i2*128*1024;
+			}
+		}
+		return -1;
+	}
+	else if (block == 64) {
+		for (i3=0; i3<16; i3++) { /* 64K */
+			if (i3s[i3] != FREE)
+				continue;
+			else {
+				i3s[i3] = ALLOCATED;
+				i2s[i3 >> 1] = ALLOCATED;
+				i1s[i3 >> 2] = ALLOCATED;
+				i0s[i3 >> 3] = ALLOCATED;
+
+				for (i=i3*2, j=0;  j<2;  i++, j++) i4s[i] = ALLOCATED;
+				for (i=i3*4, j=0;  j<4;  i++, j++) i5s[i] = ALLOCATED;
+				for (i=i3*8, j=0;  j<8;  i++, j++) i6s[i] = ALLOCATED;
+				for (i=i3*16, j=0; j<16; i++, j++) i7s[i] = ALLOCATED;
+				return i3*64*1024;
+			}
+		}
+		return -1;
+	}
+	else if (block == 32) {
+		for (i4=0; i4<32; i4++) { /* 32K */
+			if (i4s[i4] != FREE)
+				continue;
+			else {
+				i4s[i4] = ALLOCATED; /* Bingo! */
+				i3s[i4 >> 1] = ALLOCATED;
+				i3s[i4 >> 2] = ALLOCATED;
+				i2s[i4 >> 3] = ALLOCATED;
+				i1s[i4 >> 4] = ALLOCATED;
+
+				for (i=i4*2, j=0; j<2; i++, j++) i5s[i] = ALLOCATED;
+				for (i=i4*4, j=0; j<4; i++, j++) i6s[i] = ALLOCATED;
+				for (i=i4*8, j=0; j<8; i++, j++) i7s[i] = ALLOCATED;
+				return i4*32*1024;
+			}
+		}
+		return -1;
+	}
+	else if (block == 16) {
+		for (i5=0; i5<64; i5++) { /* 16K */
+			if (i5s[i5] != FREE)
+				continue;
+			else {
+				i5s[i5] = ALLOCATED; /* Bingo! */
+				i4s[i5 >> 1] = ALLOCATED;
+				i3s[i5 >> 2] = ALLOCATED;
+				i2s[i5 >> 3] = ALLOCATED;
+				i1s[i5 >> 4] = ALLOCATED;
+				i0s[i5 >> 5] = ALLOCATED;
+
+				for (i=i5*2, j=0; j<2; i++, j++) i6s[i] = ALLOCATED;
+				for (i=i5*4, j=0; j<4; i++, j++) i7s[i] = ALLOCATED;
+				return i5*16*1024;
+			}
+		}
+		return -1;
+	}
+	else if (block == 8) {
+		for (i6=0; i6<128; i6++) { /* 8K */
+			if (i6s[i6] != FREE)
+				continue;
+			else {
+				i6s[i6] = ALLOCATED; /* Bingo! */
+				i5s[i6 >> 1] = ALLOCATED;
+				i4s[i6 >> 2] = ALLOCATED;
+				i3s[i6 >> 3] = ALLOCATED;
+				i2s[i6 >> 4] = ALLOCATED;
+				i1s[i6 >> 5] = ALLOCATED;
+				i0s[i6 >> 6] = ALLOCATED;
+
+				for (i=i6*2, j=0; j<2; i++, j++) i7s[i] = ALLOCATED;
+				return i6*8*1024;
+			}
+		}
+		return -1;
+	}
+	else if (block == 4) {
+		for (i7=0; i7<256; i7++) { /* 4K */
+			if (i7s[i7] != FREE)
+				continue;
+			else {
+				i7s[i7] = ALLOCATED; /* Bingo! */
+				i6s[i7 >> 1] = ALLOCATED;
+				i5s[i7 >> 2] = ALLOCATED;
+				i4s[i7 >> 3] = ALLOCATED;
+				i3s[i7 >> 4] = ALLOCATED;
+				i2s[i7 >> 5] = ALLOCATED;
+				i1s[i7 >> 6] = ALLOCATED;
+				i0s[i7 >> 7] = ALLOCATED;
+				return i7*4*1024;
+			}
+		}
+		return -1;
+	}
+	return -1;
+}
+
+#ifdef YBA_UNIT_TEST
+#include <stdio.h>
+
+int main() {
+	// init_allocator();
+	allocate(4);
+	allocate(8);
+	allocate(16);
+	allocate(4);
+	allocate(8);
+	allocate(16);
+	allocate(32);
+	allocate(4);
+	allocate(8);
+	allocate(16);
+	allocate(32);
+	allocate(64);
+	allocate(4);
+	allocate(8);
+	allocate(16);
+	allocate(32);
+	allocate(64);
+	allocate(128);
+	allocate(4);
+	allocate(8);
+	allocate(16);
+	allocate(32);
+	allocate(64);
+	allocate(128);
+	allocate(256);
+	allocate(4);
+	allocate(8);
+	allocate(16);
+	allocate(32);
+	allocate(64);
+	allocate(128);
+	allocate(4);
+	allocate(4);
+	return 0;
+}
+#endif
 
 size_t strlcat(char *dest, const char *src, size_t count)
 {
@@ -316,6 +543,8 @@ void wake_up_interruptible(struct wait_queue_head *wq)
 }
 
 /* DMA buffers */
+#ifndef UIO_DMEM_GENIRQ_ALLOC
+
 void *wil_dma_zalloc_coherent(struct wil6210_priv *wil, const char *name,
     uint16_t id, size_t size, dma_mem_t *m)
 {
@@ -328,6 +557,8 @@ void *wil_dma_zalloc_coherent(struct wil6210_priv *wil, const char *name,
 
 	snprintf(z_name, sizeof(z_name), "%s_%s_%#lx_%u",
 		 "wl", name, (uintptr_t)wil, id);
+
+	wil_dbg_txrx(wil, "YBA wil_dma_zalloc_coherent [%s] [%lu]\n", z_name, size);
 	mz = rte_memzone_lookup(z_name);
 	if (mz == NULL) {
 		/*
@@ -368,6 +599,9 @@ void *wil_dma_zalloc_coherent(struct wil6210_priv *wil, const char *name,
 	m->dma_mz = mz;
 	m->dma_base = mz->addr;
 
+	wil_dbg_txrx(wil, "YBA wil_dma_zalloc_coherent: dma_base[%lu], iova[%lu]\n", m->dma_base, mz->iova);
+	wil_dbg_txrx(wil, "YBA wil_dma_zalloc_coherent: len[%lu], hugepage_sz[%lu]\n", mz->len, mz->hugepage_sz);
+	wil_dbg_txrx(wil, "YBA wil_dma_zalloc_coherent: addr[%lu], socket_id[%d]\n", mz->addr, mz->socket_id);
 	return m->dma_base;
 }
 
@@ -381,6 +615,116 @@ void wil_dma_free_coherent(struct wil6210_priv *wil, dma_mem_t *m)
 
 	memset(m, 0, sizeof(*m));
 }
+#else
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <unistd.h>
+
+#define SYNC_MODE_NONCACHED     (0x01)
+static int udmafd = -1;
+unsigned long  phys_addr;
+unsigned int   buf_size;
+unsigned char* vbuf;
+
+void *wil_dma_zalloc_coherent(struct wil6210_priv *wil, const char *name,
+    uint16_t id, size_t size, dma_mem_t *m)
+{
+	struct rte_memzone *mz;
+	char z_name[RTE_MEMZONE_NAMESIZE];
+	unsigned flags;
+	size_t align;
+	int offset;
+
+	memset(m, 0, sizeof(*m));
+	//size += sizeof(struct rte_memzone);
+
+	unsigned char attr[1024];
+
+	if (-1 == udmafd) {
+		wil_dbg_txrx(wil, "YBA initializing DMA mmap\n");
+		if (-1 != (udmafd = open("/sys/class/u-dma-buf/udmabuf0/sync_mode", O_WRONLY))) {
+			sprintf(attr, "%d", SYNC_MODE_NONCACHED);
+			write(udmafd, attr, strlen(attr));
+			close(udmafd);
+		}
+
+		if (-1 == udmafd) {
+			wil_dbg_txrx(wil, "YBA cannot reserve DMA zone for %s:%u %#jx: %s",
+				name, id, size, rte_strerror(rte_errno));
+			// return NULL;
+		}
+
+		if ((udmafd = open("/sys/class/u-dma-buf/udmabuf0/phys_addr", O_RDONLY)) != -1) {
+			read(udmafd, attr, 1024);
+			sscanf(attr, "%lx", &phys_addr);
+			close(udmafd);
+		}
+
+		if ((udmafd  = open("/sys/class/u-dma-buf/udmabuf0/size", O_RDONLY)) != -1) {
+			read(udmafd, attr, 1024);
+			sscanf(attr, "%d", &buf_size);
+			close(udmafd);
+		}
+
+		if (-1 != (udmafd = open("/dev/udmabuf0", O_RDWR | O_SYNC))) {
+			vbuf = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED, udmafd, 0);
+			wil_dbg_txrx(wil, "YBA mmap succeeded\n");
+		}
+		else
+			wil_dbg_txrx(wil, "YBA cannot mmap\n");
+	}
+
+	if (0 == size/1024)
+		offset = allocate(4096/1024);
+	else
+		offset = allocate(size/1024);
+
+	if (0 > offset)
+		wil_dbg_txrx(wil, "YBA allocate failed\n");
+	else
+		wil_dbg_txrx(wil, "YBA allocated block [%d]\n", offset);
+
+	mz = rte_zmalloc("wil6210", sizeof(struct rte_memzone), 0);
+	if (mz == NULL) {
+		wil_dbg_txrx(wil, "YBA mz alloc failed\n");
+		return ERR_PTR(-ENOMEM);
+	}
+
+	snprintf(z_name, sizeof(z_name), "%s_%s_%#lx_%u",
+		 "wl", name, (uintptr_t)wil, id);
+
+	strncpy(mz->name, z_name, 32);
+	mz->iova = phys_addr+offset;
+	mz->addr = vbuf+offset;
+	mz->socket_id = 0;
+	mz->len = size;
+	mz->flags = 0;
+	mz->hugepage_sz = buf_size;
+
+	m->dma_mz = mz;
+	m->dma_addr = mz->iova;
+	m->dma_base = mz->addr;
+
+	wil_dbg_txrx(wil, "YBA wil_dma_zalloc_coherent: dma_base[%lu], iova[%lu]\n", m->dma_base, mz->iova);
+	wil_dbg_txrx(wil, "YBA wil_dma_zalloc_coherent: len[%lu], hugepage_sz[%lu]\n", mz->len, mz->hugepage_sz);
+	wil_dbg_txrx(wil, "YBA wil_dma_zalloc_coherent: addr[%lu], socket_id[%d]\n", mz->addr, mz->socket_id);
+	return m->dma_base;
+
+}
+
+void wil_dma_free_coherent(struct wil6210_priv *wil, dma_mem_t *m)
+{
+	int rc;
+
+	rc = munmap(m->dma_mz->addr, m->dma_mz->len);	// todo size
+	if (rc != 0)
+		wil_err(wil, "rte_memzone_free(() failed: %d", rc);
+
+	memset(m, 0, sizeof(*m));
+}
+#endif // UIO_DMEM_GENIRQ_ALLOC
 
 void get_random_bytes(void *buf, int nbytes)
 {

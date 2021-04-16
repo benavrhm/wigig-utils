@@ -103,8 +103,10 @@ static int wil_sring_alloc(struct wil6210_priv *wil,
 	 */
 	sring->va = wil_dma_zalloc_coherent(wil, "sring",
 	    sring - &wil->srings[0], sz, &sring->dmah);
-	if (!sring->va)
+	if (!sring->va) {
+		wil_dbg_txrx(wil, "Yikes, wil_dma_zalloc_coherent 2 ERROR\n");
 		return -ENOMEM;
+	}
 	sring->pa = sring->dmah.dma_addr;
 
 	wil_dbg_misc(wil, "status_ring[%d] 0x%p:%#jx\n", sring->size, sring->va,
@@ -141,8 +143,10 @@ static int wil_tx_init_edma(struct wil6210_priv *wil)
 	sring->size = status_ring_size;
 	sring->elem_size = sizeof(struct wil_ring_tx_status);
 	rc = wil_sring_alloc(wil, sring);
-	if (rc)
+	if (rc) {
+		wil_dbg_txrx(wil, "Yikes, wil_sring_alloc ERROR\n");
 		return rc;
+	}
 
 	rc = wil_wmi_tx_sring_cfg(wil, ring_id);
 	if (rc)
@@ -177,12 +181,14 @@ static int wil_ring_alloc_skb_edma(struct wil6210_priv *wil,
 
 	if (unlikely(list_empty(free))) {
 		wil->rx_buff_mgmt.free_list_empty_cnt++;
+		wil_dbg_txrx(wil, "Yikes, incremented free_list_empty_cnt [%ld]\n", wil->rx_buff_mgmt.free_list_empty_cnt);
 		return -EAGAIN;
 	}
 
 	skb = rte_pktmbuf_alloc(ring->mpool);
 	if (unlikely(!skb)) {
 		wil_err(wil, "Unable to alloc mbuf\n");
+		wil_dbg_txrx(wil, "Yikes, Unable to alloc mbuf\n");
 		return -ENOMEM;
 	}
 
@@ -201,6 +207,7 @@ static int wil_ring_alloc_skb_edma(struct wil6210_priv *wil,
 	buff_id = rx_buff->id;
 
 	/* Move a buffer from the free list to the active list */
+	// wil_dbg_txrx(wil, "YBA: 1 Move a buffer from the free list to the active list [%ld]\n", wil->rx_buff_mgmt.free_list_empty_cnt);
 	list_move(&rx_buff->list, active);
 
 	buff_arr[buff_id].skb = skb;
@@ -236,12 +243,18 @@ static int wil_rx_refill_edma(struct wil6210_priv *wil)
 	struct wil_ring *ring = &wil->ring_rx;
 	u32 next_head, swhead;
 	int rc = 0;
+	int count = 0;
 	ring->swtail = *ring->edma_rx_swtail.va;
+
+	// too much noise wil_dbg_txrx(wil, "YBA: Entered wil_rx_refill_edma\n");
+	// wil_dbg_txrx(wil, "YBA: swhead [%lu] next_head [%lu] swtail [%lu] fle [%lu]\n", ring->swhead, wil_ring_next_head(ring), ring->swtail, wil->rx_buff_mgmt.free_list_empty_cnt);
 
 	swhead = ring->swhead;
 	for (; next_head = wil_ring_next_head(ring),
 	     (next_head != ring->swtail);
 	     ring->swhead = next_head) {
+		count++;
+		wil_dbg_txrx(wil, "YBA: wil_rx_refill_edma calling wil_ring_alloc_skb_edma [%d]\n", count);
 		rc = wil_ring_alloc_skb_edma(wil, ring, ring->swhead);
 		if (unlikely(rc)) {
 			if (rc == -EAGAIN)
@@ -271,6 +284,8 @@ static void wil_move_all_rx_buff_to_free_list(struct wil6210_priv *wil,
 {
 	struct list_head *active = &wil->rx_buff_mgmt.active;
 
+	wil_dbg_txrx(wil, "YBA: Entered wil_move_all_rx_buff_to_free_list\n");
+
 	while (!list_empty(active)) {
 		struct wil_rx_buff *rx_buff =
 			list_first_entry(active, struct wil_rx_buff, list);
@@ -284,6 +299,7 @@ static void wil_move_all_rx_buff_to_free_list(struct wil6210_priv *wil,
 		}
 
 		/* Move the buffer from the active to the free list */
+		wil_dbg_txrx(wil, "YBA: 2 Move a buffer from the active list to the free list\n");
 		list_move(&rx_buff->list, &wil->rx_buff_mgmt.free);
 	}
 }
@@ -292,12 +308,15 @@ static void wil_free_rx_buff_arr(struct wil6210_priv *wil)
 {
 	struct wil_ring *ring = &wil->ring_rx;
 
-	if (!wil->rx_buff_mgmt.buff_arr)
+	if (!wil->rx_buff_mgmt.buff_arr) {
+		wil_dbg_txrx(wil, "YBA: Whoops! !wil->rx_buff_mgmt.buff_arr\n");
 		return;
+	}
 
 	/* Move all the buffers to the free list in case active list is
 	 * not empty in order to release all SKBs before deleting the array
 	 */
+	wil_dbg_txrx(wil, "YBA: 3 Move all the buffers to the free list\n");
 	wil_move_all_rx_buff_to_free_list(wil, ring);
 
 	kfree(wil->rx_buff_mgmt.buff_arr);
@@ -312,11 +331,15 @@ static int wil_init_rx_buff_arr(struct wil6210_priv *wil,
 	struct list_head *free = &wil->rx_buff_mgmt.free;
 	int i;
 
+	wil_dbg_txrx(wil, "YBA: Entered wil_init_rx_buff_arr\n");
+
 	wil->rx_buff_mgmt.buff_arr = kcalloc(size + 1,
 					     sizeof(struct wil_rx_buff),
 					     GFP_KERNEL);
-	if (!wil->rx_buff_mgmt.buff_arr)
+	if (!wil->rx_buff_mgmt.buff_arr) {
+		wil_dbg_txrx(wil, "YBA: wil_init_rx_buff_arr kcalloc ERROR\n");
 		return -ENOMEM;
+	}
 
 	/* Set list heads */
 	INIT_LIST_HEAD(active);
@@ -353,12 +376,16 @@ static int wil_init_rx_sring(struct wil6210_priv *wil,
 	sring->size = status_ring_size;
 	sring->elem_size = elem_size;
 	rc = wil_sring_alloc(wil, sring);
-	if (rc)
+	if (rc) {
+		wil_dbg_txrx(wil, "Yikes, wil_sring_alloc ERROR\n");
 		return rc;
+	}
 
 	rc = wil_wmi_rx_sring_add(wil, ring_id);
-	if (rc)
+	if (rc) {
+		wil_dbg_txrx(wil, "Yikes, wil_wmi_rx_sring_add ERROR\n");
 		goto out_free;
+	}
 
 	sring->desc_rdy_pol = 1;
 
@@ -381,8 +408,10 @@ static int wil_ring_alloc_desc_ring(struct wil6210_priv *wil,
 	ring->swhead = 0;
 	ring->swtail = 0;
 	ring->ctx = kcalloc(ring->size, sizeof(ring->ctx[0]), GFP_KERNEL);
-	if (!ring->ctx)
+	if (!ring->ctx) {
+		wil_dbg_txrx(wil, "Yikes, wil_ring_alloc_desc_ring kcalloc ERROR\n");
 		goto err;
+	}
 
 	if (!ring->is_rx)
 		ring_index = ring - wil->ring_tx;
@@ -391,8 +420,10 @@ static int wil_ring_alloc_desc_ring(struct wil6210_priv *wil,
 
 	ring->va = wil_dma_zalloc_coherent(wil, "desc-ring", ring_index, sz,
 	    &ring->dmah);
-	if (!ring->va)
+	if (!ring->va) {
+		wil_dbg_txrx(wil, "Yikes, wil_dma_zalloc_coherent 1 ERROR\n");
 		goto err_free_ctx;
+	}
 	ring->pa = ring->dmah.dma_addr;
 
 	if (ring->is_rx) {
@@ -400,8 +431,10 @@ static int wil_ring_alloc_desc_ring(struct wil6210_priv *wil,
 		ring->edma_rx_swtail.va =
 			wil_dma_zalloc_coherent(wil, "rx-swtail", ring_index,
 			    sz, &ring->edma_rx_swtail.dmah);
-		if (!ring->edma_rx_swtail.va)
+		if (!ring->edma_rx_swtail.va) {
+			wil_dbg_txrx(wil, "Yikes, wil_dma_zalloc_coherent 2 ERROR\n");
 			goto err_free_va;
+		}
 		ring->edma_rx_swtail.pa = ring->edma_rx_swtail.dmah.dma_addr;
 	}
 
@@ -488,12 +521,16 @@ static int wil_init_rx_desc_ring(struct wil6210_priv *wil, u16 desc_ring_size,
 	ring->size = desc_ring_size;
 	ring->is_rx = true;
 	rc = wil_ring_alloc_desc_ring(wil, ring);
-	if (rc)
+	if (rc) {
+		wil_dbg_txrx(wil, "Yikes, wil_ring_alloc_desc_ring ERROR\n");
 		return rc;
+	}
 
 	rc = wil_wmi_rx_desc_ring_add(wil, status_ring_id);
-	if (rc)
+	if (rc) {
+		wil_dbg_txrx(wil, "Yikes, wil_wmi_rx_desc_ring_add ERROR\n");
 		goto out_free;
+	}
 
 	return 0;
 out_free:
@@ -676,8 +713,9 @@ static int wil_rx_init_edma(struct wil6210_priv *wil, uint desc_ring_order)
 		}
 		rc = wil_init_rx_sring(wil, status_ring_size, elem_size,
 				       sring_id);
-		if (rc)
+		if (rc) {
 			goto err_free_status;
+		}
 	}
 
 	/* Allocate descriptor ring */
@@ -737,8 +775,10 @@ static int wil_ring_init_tx_edma(struct wil6210_vif *vif, int ring_id,
 	wil_tx_data_init(txdata);
 	ring->size = size;
 	rc = wil_ring_alloc_desc_ring(wil, ring);
-	if (rc)
+	if (rc) {
+		wil_dbg_txrx(wil, "Yikes, wil_ring_alloc_desc_ring ERROR\n");
 		goto out;
+	}
 
 	wil->ring2cid_tid[ring_id][0] = cid;
 	wil->ring2cid_tid[ring_id][1] = tid;
@@ -896,6 +936,7 @@ static struct rte_mbuf *wil_sring_reap_rx_edma(struct wil6210_priv *wil,
 	RTE_BUILD_BUG_ON(sizeof(struct wil_rx_status_extended) > RTE_PKTMBUF_HEADROOM);
 
 again:
+	// too much noise wil_dbg_txrx(wil, "YBA: Entered wil_sring_reap_rx_edma\n");
 	wil_get_next_rx_status_msg(sring, msg);
 	dr_bit = wil_rx_status_get_desc_rdy_bit(msg);
 
@@ -948,6 +989,7 @@ again:
 		wil_err(wil, "No Rx skb at buff_id %d\n", buff_id);
 		wil_rx_status_reset_buff_id(sring);
 		/* Move the buffer from the active list to the free list */
+		wil_dbg_txrx(wil, "YBA: 4 Move the buffer from the active list to the free list\n");
 		list_move_tail(&wil->rx_buff_mgmt.buff_arr[buff_id].list,
 			       &wil->rx_buff_mgmt.free);
 		wil_sring_advance_swhead(sring);
@@ -960,6 +1002,7 @@ again:
 	wil_sring_advance_swhead(sring);
 
 	/* Move the buffer from the active list to the free list */
+	wil_dbg_txrx(wil, "YBA: 5 Move the buffer from the active list to the free list\n");
 	list_move_tail(&wil->rx_buff_mgmt.buff_arr[buff_id].list,
 		       &wil->rx_buff_mgmt.free);
 
@@ -1087,6 +1130,7 @@ uint16_t wil_rx_burst(struct wil6210_priv *wil, struct rte_mbuf **rx_pkts,
 	u32 swhead;
 	int i;
 
+	// too much noise wil_dbg_txrx(wil, "YBA: Entered wil_rx_burst\n");
 #ifdef DEBUG_LATENCY
 	u64 start = rte_get_timer_cycles() * wil->nano_per_cycle;
 	u64 diff = start - wil->last_burst_rx_nano;
@@ -1199,11 +1243,12 @@ void wil_rx_handle_edma(struct wil6210_priv *wil, int *quota)
 	struct rte_mbuf *skb;
 	int i;
 
+	wil_dbg_txrx(wil, "YBA: Entered rx_handle_edma\n");
+
 	if (unlikely(!ring->va)) {
 		wil_err(wil, "Rx IRQ while Rx not yet initialized\n");
 		return;
 	}
-	wil_dbg_txrx(wil, "rx_handle\n");
 
 	for (i = 0; i < wil->num_rx_status_rings; i++) {
 		sring = &wil->srings[i];
@@ -1305,6 +1350,7 @@ int wil_tx_sring_handler(struct wil6210_priv *wil,
 	wil_get_next_tx_status_msg(sring, &msg);
 	dr_bit = msg.desc_ready >> TX_STATUS_DESC_READY_POS;
 
+	// too much noise wil_dbg_txrx(wil, "YBA: Entered wil_tx_sring_handler\n");
 	/* Process completion messages while DR bit has the expected polarity */
 	while (dr_bit == sring->desc_rdy_pol) {
 		num_descs = msg.num_descriptors;
@@ -1701,8 +1747,10 @@ static int wil_ring_init_bcast_edma(struct wil6210_vif *vif, int ring_id,
 	ring->size = size;
 	ring->is_rx = false;
 	rc = wil_ring_alloc_desc_ring(wil, ring);
-	if (rc)
+	if (rc) {
+		wil_dbg_txrx(wil, "Yikes, wil_ring_alloc_desc_ring 2 ERROR\n");
 		goto out;
+	}
 
 	wil->ring2cid_tid[ring_id][0] = WIL6210_MAX_CID; /* CID */
 	wil->ring2cid_tid[ring_id][1] = 0; /* TID */

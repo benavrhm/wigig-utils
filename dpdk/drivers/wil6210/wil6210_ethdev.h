@@ -8,6 +8,7 @@
 #ifndef __WIL6210_H__
 #define __WIL6210_H__
 
+#include <syslog.h>
 #include "wil6210_compat.h"
 #include "wmi.h"
 #include "wil_platform.h"
