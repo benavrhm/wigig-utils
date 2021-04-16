@@ -57,8 +57,10 @@ void wil_set_log_dbg_mask(u32 * mask) {
 
 	for (i = 0; i < WIL_DBG_LOG_NUM; i++) {
 		level = rte_log_get_level(wil_dbg_log[i].log_type_idx);
-		if (level >= WIL_DBG_LOG_LEVEL)
+		if (level >= WIL_DBG_LOG_LEVEL) {
 			*mask |= 1 << i; /* Enable this log */
+			syslog(LOG_ERR, "YBA: enabled log [%s] %s %d \n", wil_dbg_log[i].log_type_str, __FUNCTION__,__LINE__);
+		}
 	}
 }
 

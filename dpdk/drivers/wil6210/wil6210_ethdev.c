@@ -204,10 +204,14 @@ wil6210_tx_get_pipe_size(void *q, uint16_t *size,
 		    uint32_t nb_peers)
 {
 	struct pmd_internals *internals = q;
-	if (unlikely(q == NULL || size == NULL
-			|| nb_peers > ARRAY_SIZE(internals->tx_ethdev_queues)))
-		return -EINVAL;
 	struct wil6210_priv *wil = internals->wil;
+
+	if (unlikely(q == NULL || size == NULL
+			|| nb_peers > ARRAY_SIZE(internals->tx_ethdev_queues))) {
+		wil_dbg_txrx(wil, "Yikes, wil6210_tx_get_pipe_size failed\n");
+		return -EINVAL;
+	}
+	// struct wil6210_priv *wil = internals->wil;
 
 	for (int peer=0; peer < nb_peers; peer++) {
 		*size++ = wil_tx_ring_config_size();
@@ -430,6 +434,7 @@ eth_dev_start(struct rte_eth_dev *dev)
 	struct wil6210_priv *wil;
 	int rc;
 
+	syslog(LOG_ERR, "YBA: was here %s %d \n",__FUNCTION__,__LINE__);
 	if (dev == NULL)
 		return -EINVAL;
 
