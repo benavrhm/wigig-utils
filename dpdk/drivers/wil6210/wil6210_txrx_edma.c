@@ -785,9 +785,11 @@ static int wil_ring_init_tx_edma(struct wil6210_vif *vif, int ring_id,
 	if (!vif->privacy)
 		txdata->dot1x_open = true;
 
+	wil_err(wil, "calling WMI_TX_DESC_RING_ADD_CMD\n");
 	rc = wil_wmi_tx_desc_ring_add(vif, ring_id, cid, tid);
 	if (rc) {
 		wil_err(wil, "WMI_TX_DESC_RING_ADD_CMD failed\n");
+		wil_dbg_txrx(wil, "Yikes, WMI_TX_DESC_RING_ADD_CMD ERROR\n");
 		goto out_free;
 	}
 
@@ -952,7 +954,7 @@ again:
 		struct wil_rx_status_extended *s;
 
 		wil_dbg_txrx(wil,
-			     "buff_id is not updated yet by HW, (swhead 0x%x)\n",
+			     "wil_sring_reap_rx_edma: buff_id is not updated yet by HW, (swhead 0x%x)\n",
 			     sring->swhead);
 		if (++invalid_buff_id_retry > MAX_INVALID_BUFF_ID_RETRY)
 			break;
@@ -965,7 +967,7 @@ again:
 	}
 
 	if (unlikely(!wil_val_in_range(buff_id, 1, wil->rx_buff_mgmt.size))) {
-		wil_err(wil, "Corrupt buff_id=%d, sring->swhead=%d\n",
+		wil_err(wil, "wil_sring_reap_rx_edma: Corrupt buff_id=%d, sring->swhead=%d\n",
 			buff_id, sring->swhead);
 		wil_rx_status_reset_buff_id(sring);
 		wil_sring_advance_swhead(sring);
@@ -1155,6 +1157,7 @@ uint16_t wil_rx_burst(struct wil6210_priv *wil, struct rte_mbuf **rx_pkts,
 
 	nb_done = 0;
 	for (i = 0; i < wil->num_rx_status_rings; i++) {
+		//wil_dbg_txrx(wil, "YBA: wil_rx_burst num_rx_status_rings [%d]\n", i);
 		sring = &wil->srings[i];
 		if (unlikely(!sring->va)) {
 			wil_err(wil,
@@ -1166,6 +1169,7 @@ uint16_t wil_rx_burst(struct wil6210_priv *wil, struct rte_mbuf **rx_pkts,
 		while (nb_done < nb_pkts &&
 		       (NULL != (mbuf =
 			wil_sring_reap_rx_edma(wil, sring, ring->port_id)))) {
+			wil_dbg_txrx(wil, "YBA: wil_rx_burst use_rx_hw_reordering\n");
 			if (wil->use_rx_hw_reordering) {
 				void *msg = wil_skb_rxstatus(mbuf);
 				int mid = wil_rx_status_get_mid(msg);
@@ -1201,6 +1205,7 @@ uint16_t wil_rx_burst(struct wil6210_priv *wil, struct rte_mbuf **rx_pkts,
 				stats->rx_packets++;
 				stats->rx_bytes += mbuf->pkt_len;
 			} else {
+				wil_dbg_txrx(wil, "YBA: wil_rx_burst wil_rx_reorder\n");
 				wil_rx_reorder(wil, mbuf);
 			}
 		}
@@ -1209,6 +1214,7 @@ uint16_t wil_rx_burst(struct wil6210_priv *wil, struct rte_mbuf **rx_pkts,
 			wil_w(wil, sring->hwtail, (sring->swhead - 1) % sring->size);
 	}
 
+	// wil_dbg_txrx(wil, "YBA: wil_rx_burst wil_rx_refill_edma\n");
 	wil_rx_refill_edma(wil);
 
 	/* Process TX completions */

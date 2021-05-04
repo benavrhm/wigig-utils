@@ -4286,6 +4286,7 @@ int wil_wmi_rx_desc_ring_add(struct wil6210_priv *wil, int status_ring_id)
 	}
 
 	ring->hwtail = le32_to_cpu(reply.evt.ring_tail_ptr);
+	wil_err(wil, "YBA wil_wmi_rx_desc_ring_add: WMI_RX_DESC_RING_ADD_CMD succeeded\n");
 
 	return 0;
 }

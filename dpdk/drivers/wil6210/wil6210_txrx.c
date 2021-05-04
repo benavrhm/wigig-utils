@@ -262,6 +262,7 @@ static int __wil_tx_ring(struct wil6210_priv *wil, struct wil6210_vif *vif,
 	int nr_frags;
 	uint f = 0;
 	int ring_index = ring - wil->ring_tx;
+	wil_dbg_txrx(wil, "YBA tx_ring entry\n");
 	struct wil_ring_tx_data  *txdata = &wil->ring_tx_data[ring_index];
 	u8 cid = txdata->cid;
 	struct wil_net_stats *stats = (cid < WIL6210_MAX_CID) ?
@@ -273,7 +274,7 @@ static int __wil_tx_ring(struct wil6210_priv *wil, struct wil6210_vif *vif,
 	uint len = rte_pktmbuf_data_len(skb);
 
 	nr_frags = skb->nb_segs - 1;
-	wil_dbg_txrx(wil, "tx_ring: %d bytes to ring %d, nr_frags %d\n",
+	wil_dbg_txrx(wil, "__wil_tx_ring: %d bytes to ring %d, nr_frags %d\n",
 		     len, ring_index, nr_frags);
 
 	if (stats)
@@ -294,7 +295,7 @@ static int __wil_tx_ring(struct wil6210_priv *wil, struct wil6210_vif *vif,
 
 	pa = rte_mbuf_data_iova(skb);
 
-	wil_dbg_txrx(wil, "Tx[%2d] skb %d bytes 0x%p -> %llx\n", ring_index,
+	wil_dbg_txrx(wil, "__wil_tx_ring: Tx[%2d] skb %d bytes 0x%p -> %llx\n", ring_index,
 		     len, rte_pktmbuf_mtod(skb, void*), (unsigned long long)pa);
 	wil_hex_dump_txrx("Tx ", DUMP_PREFIX_OFFSET, 16, 1,
 			  rte_pktmbuf_mtod(skb, void*), len, false);
@@ -324,7 +325,7 @@ static int __wil_tx_ring(struct wil6210_priv *wil, struct wil6210_vif *vif,
 		int len = rte_pktmbuf_data_len(frag);
 
 		*_d = *d;
-		wil_dbg_txrx(wil, "Tx[%2d] desc[%4d]\n", ring_index, i);
+		wil_dbg_txrx(wil, "__wil_tx_ring: Tx[%2d] desc[%4d]\n", ring_index, i);
 		wil_hex_dump_txrx("TxD ", DUMP_PREFIX_NONE, 32, 4,
 				  (const void *)d, sizeof(*d), false);
 		i = (swhead + f + 1) % ring->size;
@@ -345,7 +346,7 @@ static int __wil_tx_ring(struct wil6210_priv *wil, struct wil6210_vif *vif,
 	d->dma.d0 |= BIT(DMA_CFG_DESC_TX_0_CMD_MARK_WB_POS);
 	d->dma.d0 |= BIT(DMA_CFG_DESC_TX_0_CMD_DMA_IT_POS);
 	*_d = *d;
-	wil_dbg_txrx(wil, "Tx[%2d] desc[%4d]\n", ring_index, i);
+	wil_dbg_txrx(wil, "__wil_tx_ring Tx[%2d] desc[%4d]\n", ring_index, i);
 	wil_hex_dump_txrx("TxD ", DUMP_PREFIX_NONE, 32, 4,
 			  (const void *)d, sizeof(*d), false);
 
@@ -374,7 +375,7 @@ static int __wil_tx_ring(struct wil6210_priv *wil, struct wil6210_vif *vif,
 
 	/* advance swhead */
 	wil_ring_advance_head(ring, nr_frags + 1);
-	wil_dbg_txrx(wil, "Tx[%2d] swhead %d -> %d\n", ring_index, swhead,
+	wil_dbg_txrx(wil, "__wil_tx_ring: Tx[%2d] swhead %d -> %d\n", ring_index, swhead,
 		     ring->swhead);
 	//trace_wil6210_tx(ring_index, swhead, pkt_len, nr_frags);
 
@@ -424,6 +425,7 @@ int wil_tx_ring(struct wil6210_priv *wil, struct wil6210_vif *vif,
 	struct wil_ring_tx_data *txdata = &wil->ring_tx_data[ring_index];
 	int rc;
 
+	wil_dbg_txrx(wil, "YBA wil_tx_ring spin_lock\n");
 	spin_lock(&txdata->lock);
 
 	if (test_bit(wil_status_suspending, wil->status) ||
@@ -435,10 +437,12 @@ int wil_tx_ring(struct wil6210_priv *wil, struct wil6210_vif *vif,
 		return -EINVAL;
 	}
 
+	wil_dbg_txrx(wil, "YBA wil_tx_ring __wil_tx_ring\n");
 	rc = (skb_is_gso(skb) ? wil->txrx_ops.tx_ring_tso : __wil_tx_ring)
 	     (wil, vif, ring, skb);
 
 	spin_unlock(&txdata->lock);
+	wil_dbg_txrx(wil, "YBA wil_tx_ring spin_unlock\n");
 
 	return rc;
 }

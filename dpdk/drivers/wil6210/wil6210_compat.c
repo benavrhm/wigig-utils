@@ -78,12 +78,12 @@ int allocate(size_t block) {
 				i1s[i1] = ALLOCATED; /* Bingo! */
 				i0s[i1 >> 1] = ALLOCATED;
 
-				for (i=i1*4, j=0;   j<4;   i++, j++) i2s[i] = ALLOCATED;
-				for (i=i1*8, j=0;   j<8;   i++, j++) i3s[i] = ALLOCATED;
-				for (i=i1*16, j=0;  j<16;  i++, j++) i4s[i] = ALLOCATED;
-				for (i=i1*32, j=0;  j<32;  i++, j++) i5s[i] = ALLOCATED;
-				for (i=i1*64, j=0;  j<64;  i++, j++) i6s[i] = ALLOCATED;
-				for (i=i1*128, j=0; j<128; i++, j++) i7s[i] = ALLOCATED;
+				for (i=i1*2,  j=0;  j<2;   i++, j++) i2s[i] = ALLOCATED;
+				for (i=i1*4,  j=0;  j<4;   i++, j++) i3s[i] = ALLOCATED;
+				for (i=i1*8,  j=0;  j<8;   i++, j++) i4s[i] = ALLOCATED;
+				for (i=i1*16, j=0;  j<16;  i++, j++) i5s[i] = ALLOCATED;
+				for (i=i1*32, j=0;  j<32;  i++, j++) i6s[i] = ALLOCATED;
+				for (i=i1*64, j=0;  j<64; i++, j++) i7s[i] = ALLOCATED;
 				return i1*256*1024;
 			}
 		}
@@ -98,11 +98,11 @@ int allocate(size_t block) {
 				i1s[i2 >> 1] = ALLOCATED;
 				i0s[i2 >> 2] = ALLOCATED;
 
-				for (i=i2*8,  j=0;  j<8;   i++, j++) i3s[i] = ALLOCATED;
-				for (i=i2*16, j=0;  j<16;  i++, j++) i4s[i] = ALLOCATED;
-				for (i=i2*32, j=0;  j<32;  i++, j++) i5s[i] = ALLOCATED;
-				for (i=i2*64, j=0;  j<64;  i++, j++) i6s[i] = ALLOCATED;
-				for (i=i2*128, j=0; j<128; i++, j++) i7s[i] = ALLOCATED;
+				for (i=i2*2,  j=0;  j<2;   i++, j++) i3s[i] = ALLOCATED;
+				for (i=i2*4,  j=0;  j<4;   i++, j++) i4s[i] = ALLOCATED;
+				for (i=i2*8,  j=0;  j<8;   i++, j++) i5s[i] = ALLOCATED;
+				for (i=i2*16, j=0;  j<16;  i++, j++) i6s[i] = ALLOCATED;
+				for (i=i2*32, j=0;  j<32;  i++, j++) i7s[i] = ALLOCATED;
 				return i2*128*1024;
 			}
 		}
